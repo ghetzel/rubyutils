@@ -78,9 +78,7 @@ func valueEncoder(v reflect.Value) encoderFunc {
 		return structEncoder
 	case reflect.Map:
 		return mapEncoder
-	case reflect.Slice:
-		return sliceEncoder
-	case reflect.Array:
+	case reflect.Slice, reflect.Array:
 		return arrayEncoder
 	case reflect.Ptr:
 		return ptrEncoder
@@ -170,6 +168,10 @@ func interfaceEncoder(e *encodeState, v reflect.Value) error {
 // encode structs
 func structEncoder(e *encodeState, v reflect.Value) error {
 	e.writeStrings(`{`)
+	if e.indentEnabled {
+		e.writeStrings("\n")
+	}
+
 	e.indentLevel += 1
 
 	defer func() {
@@ -232,6 +234,11 @@ func structEncoder(e *encodeState, v reflect.Value) error {
 // encode maps with a best-attempt at deterministic ordering
 func mapEncoder(e *encodeState, v reflect.Value) error {
 	e.writeStrings(`{`)
+
+	if e.indentEnabled {
+		e.writeStrings("\n")
+	}
+
 	e.indentLevel += 1
 
 	defer func() {
@@ -280,13 +287,34 @@ func mapEncoder(e *encodeState, v reflect.Value) error {
 	return nil
 }
 
-// encode slices
-func sliceEncoder(e *encodeState, v reflect.Value) error {
-	return nil
-}
-
-// encode arrays
+// encode arrays and slices
 func arrayEncoder(e *encodeState, v reflect.Value) error {
+	e.writeStrings(`[`)
+	e.indentLevel += 1
+
+	defer func() {
+		e.indentLevel -= 1
+		e.writeStrings(`]`)
+	}()
+
+	// iterare over strKeys to get the correct index, but pull the actual key value from keys
+	for i := 0; i < v.Len(); i++ {
+		value := v.Index(i)
+
+		if err := valueEncoder(value)(e, value); err != nil {
+			return err
+		}
+
+		// for all but the last element
+		if i < (v.Len() - 1) {
+			e.writeStrings(`, `)
+
+			if e.indentEnabled {
+				e.writeStrings("\n")
+			}
+		}
+	}
+
 	return nil
 }
 

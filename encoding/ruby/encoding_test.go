@@ -223,3 +223,27 @@ func TestEncodeSimpleMapStrMixed(t *testing.T) {
 		t.Log(e.String())
 	}
 }
+
+func TestEncodeSliceInt(t *testing.T) {
+	e := &encodeState{}
+
+	in := []int{1, 2, 3}
+
+	if err := e.marshal(in); err != nil {
+		t.Fatal(err)
+	} else {
+		t.Log(e.String())
+	}
+}
+
+func TestEncodeSliceString(t *testing.T) {
+	e := &encodeState{}
+
+	in := []string{`one`, `two`, `three`}
+
+	if err := e.marshal(in); err != nil {
+		t.Fatal(err)
+	} else {
+		t.Log(e.String())
+	}
+}
