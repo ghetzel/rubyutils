@@ -231,7 +231,8 @@ func structEncoder(e *encodeState, v reflect.Value) error {
 	return nil
 }
 
-// encode maps with a best-attempt at deterministic ordering
+// encode maps with a best-attempt at deterministic ordering by stringifying
+// key names and outputing them in lexical order
 func mapEncoder(e *encodeState, v reflect.Value) error {
 	e.writeStrings(`{`)
 
@@ -252,6 +253,7 @@ func mapEncoder(e *encodeState, v reflect.Value) error {
 	strKeys := make([]string, 0)
 	sortKeyValues := make(map[string]reflect.Value)
 
+	// attempt to convert the key value to a string and map that value to the key itself
 	for _, key := range keys {
 		if str, err := stringutil.ToString(key.Interface()); err == nil {
 			strKeys = append(strKeys, str)
@@ -279,13 +281,15 @@ func mapEncoder(e *encodeState, v reflect.Value) error {
 			key = keys[i]
 		}
 
+		// get the value at key
 		value := v.MapIndex(key)
 
+		// encode it
 		if err := keyValueEncoder(e, key, value); err != nil {
 			return err
 		}
 
-		// for all but the last element
+		// for all but the last element, add comma and (optionally) linebreak
 		if i < (len(keys) - 1) {
 			e.writeStrings(`, `)
 

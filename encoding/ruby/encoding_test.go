@@ -169,11 +169,13 @@ func TestEncodeFloat64(t *testing.T) {
 func TestEncodeString(t *testing.T) {
 	e := &encodeState{}
 
+	shouldBe := `'test'`
+
 	if err := e.marshal(`test`); err != nil {
 		t.Fatal(err)
 	} else {
-		if s := e.String(); s != `'test'` {
-			t.Fatalf("Expected \"'test'\", got \"%s\"", s)
+		if s := e.String(); s != shouldBe {
+			t.Fatalf("Expected \"%s\", got \"%s\"", shouldBe, s)
 		} else {
 			t.Log(s)
 		}
@@ -181,11 +183,13 @@ func TestEncodeString(t *testing.T) {
 
 	e.Reset()
 
+	shouldBe := `'test\'s test'`
+
 	if err := e.marshal(`test's test`); err != nil {
 		t.Fatal(err)
 	} else {
-		if s := e.String(); s != `'test\'s test'` {
-			t.Fatalf("Expected \"'test\\'s test'\", got \"%s\"", s)
+		if s := e.String(); s != shouldBe {
+			t.Fatalf("Expected \"%s\", got \"%s\"", shouldBe, s)
 		} else {
 			t.Log(s)
 		}
@@ -196,15 +200,21 @@ func TestEncodeSimpleMapStrInt(t *testing.T) {
 	e := &encodeState{}
 
 	in := map[string]int{
-		`first`:  1,
 		`second`: 2,
+		`first`:  1,
 		`third`:  3,
 	}
+
+	shouldBe := `{'first' => 1, 'second' => 2, 'third' => 3}`
 
 	if err := e.marshal(in); err != nil {
 		t.Fatal(err)
 	} else {
-		t.Log(e.String())
+		if s := e.String(); s != shouldBe {
+			t.Fatalf("Expected \"%s\", got \"%s\"", shouldBe, s)
+		} else {
+			t.Log(s)
+		}
 	}
 }
 
@@ -212,15 +222,21 @@ func TestEncodeSimpleMapStrMixed(t *testing.T) {
 	e := &encodeState{}
 
 	in := map[string]interface{}{
-		`first`:  true,
-		`second`: 4,
 		`third`:  9.6,
+		`second`: 4,
+		`first`:  true,
 	}
+
+	shouldBe := `{'first' => true, 'second' => 4, 'third' => 9.6}`
 
 	if err := e.marshal(in); err != nil {
 		t.Fatal(err)
 	} else {
-		t.Log(e.String())
+		if s := e.String(); s != shouldBe {
+			t.Fatalf("Expected \"%s\", got \"%s\"", shouldBe, s)
+		} else {
+			t.Log(s)
+		}
 	}
 }
 
@@ -228,11 +244,16 @@ func TestEncodeSliceInt(t *testing.T) {
 	e := &encodeState{}
 
 	in := []int{1, 2, 3}
+	shouldBe := `[1, 2, 3]`
 
 	if err := e.marshal(in); err != nil {
 		t.Fatal(err)
 	} else {
-		t.Log(e.String())
+		if s := e.String(); s != shouldBe {
+			t.Fatalf("Expected \"%s\", got \"%s\"", shouldBe, s)
+		} else {
+			t.Log(s)
+		}
 	}
 }
 
@@ -240,10 +261,15 @@ func TestEncodeSliceString(t *testing.T) {
 	e := &encodeState{}
 
 	in := []string{`one`, `two`, `three`}
+	shouldBe := `['one', 'two', 'three']`
 
 	if err := e.marshal(in); err != nil {
 		t.Fatal(err)
 	} else {
-		t.Log(e.String())
+		if s := e.String(); s != shouldBe {
+			t.Fatalf("Expected \"%s\", got \"%s\"", shouldBe, s)
+		} else {
+			t.Log(s)
+		}
 	}
 }
