@@ -250,10 +250,12 @@ func mapEncoder(e *encodeState, v reflect.Value) error {
 
 	// this is a trick to provide ordered maps for keys types we can sort by
 	strKeys := make([]string, 0)
+	sortKeyValues := make(map[string]reflect.Value)
 
 	for _, key := range keys {
 		if str, err := stringutil.ToString(key.Interface()); err == nil {
 			strKeys = append(strKeys, str)
+			sortKeyValues[str] = key
 		}
 	}
 
@@ -266,8 +268,17 @@ func mapEncoder(e *encodeState, v reflect.Value) error {
 	}
 
 	// iterare over strKeys to get the correct index, but pull the actual key value from keys
-	for i, _ := range strKeys {
-		key := keys[i]
+	for i, sortKey := range strKeys {
+		var key reflect.Value
+
+		// attempt to retrieve the sorted key value, otherwise just get the next
+		// one in sequence
+		if k, ok := sortKeyValues[sortKey]; ok {
+			key = k
+		} else {
+			key = keys[i]
+		}
+
 		value := v.MapIndex(key)
 
 		if err := keyValueEncoder(e, key, value); err != nil {
