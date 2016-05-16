@@ -183,7 +183,7 @@ func TestEncodeString(t *testing.T) {
 
 	e.Reset()
 
-	shouldBe := `'test\'s test'`
+	shouldBe = `'test\'s test'`
 
 	if err := e.marshal(`test's test`); err != nil {
 		t.Fatal(err)
