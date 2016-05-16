@@ -273,3 +273,38 @@ func TestEncodeSliceString(t *testing.T) {
 		}
 	}
 }
+
+func TestEncodeInterface(t *testing.T) {
+	e := &encodeState{}
+
+	var in interface{}
+	in = 42
+	shouldBe := `42`
+
+	if err := e.marshal(in); err != nil {
+		t.Fatal(err)
+	} else {
+		if s := e.String(); s != shouldBe {
+			t.Fatalf("Expected \"%s\", got \"%s\"", shouldBe, s)
+		} else {
+			t.Log(s)
+		}
+	}
+}
+
+func TestEncodePointerToString(t *testing.T) {
+	e := &encodeState{}
+
+	in := `pointed-to`
+	shouldBe := `'pointed-to'`
+
+	if err := e.marshal(&in); err != nil {
+		t.Fatal(err)
+	} else {
+		if s := e.String(); s != shouldBe {
+			t.Fatalf("Expected \"%s\", got \"%s\"", shouldBe, s)
+		} else {
+			t.Log(s)
+		}
+	}
+}

@@ -21,6 +21,11 @@ type encodeState struct {
 	indentPrefix  []byte
 }
 
+type encodeStructField struct {
+	Name  reflect.Value
+	Value reflect.Value
+}
+
 func (self *encodeState) marshal(v interface{}) error {
 	return self.reflectValue(reflect.ValueOf(v))
 }
@@ -29,20 +34,41 @@ func (self *encodeState) reflectValue(v reflect.Value) error {
 	return valueEncoder(v)(self, v)
 }
 
-func (self *encodeState) writeBytes(values ...[]byte) {
+func (self *encodeState) getIndentBytes() []byte {
+	indentation := make([]byte, 0)
+
 	if self.indentEnabled {
 		if len(self.indentPrefix) > 0 {
-			self.Write(self.indentPrefix)
+			indentation = append(indentation, self.indentPrefix...)
 		}
 
 		for i := 0; i < self.indentLevel; i++ {
-			self.Write(self.indent)
+			indentation = append(indentation, self.indent...)
 		}
 	}
 
+	return indentation
+}
+
+func (self *encodeState) writeBytesUnindented(values ...[]byte) {
 	for _, value := range values {
 		self.Write(value)
 	}
+}
+
+func (self *encodeState) writeBytes(values ...[]byte) {
+	self.Write(self.getIndentBytes())
+	self.writeBytesUnindented(values...)
+}
+
+func (self *encodeState) writeStringsUnindented(values ...string) {
+	byteset := make([][]byte, len(values))
+
+	for i, value := range values {
+		byteset[i] = []byte(value[:])
+	}
+
+	self.writeBytesUnindented(byteset...)
 }
 
 func (self *encodeState) writeStrings(values ...string) {
@@ -72,16 +98,14 @@ func valueEncoder(v reflect.Value) encoderFunc {
 		return floatEncoder
 	case reflect.String:
 		return stringEncoder
-	case reflect.Interface:
-		return interfaceEncoder
+	case reflect.Interface, reflect.Ptr:
+		return elementEncoder
 	case reflect.Struct:
 		return structEncoder
 	case reflect.Map:
 		return mapEncoder
 	case reflect.Slice, reflect.Array:
 		return arrayEncoder
-	case reflect.Ptr:
-		return ptrEncoder
 	default:
 		return unsupportedTypeEncoder
 	}
@@ -140,8 +164,19 @@ func stringEncoder(e *encodeState, v reflect.Value) error {
 
 // encode a named key-value pair (in an output hash)
 func keyValueEncoder(e *encodeState, key reflect.Value, value reflect.Value) error {
-	keyEnc := &encodeState{}
-	valEnc := &encodeState{}
+	keyEnc := &encodeState{
+		indentEnabled: e.indentEnabled,
+		indentLevel:   (e.indentLevel - 1),
+		indent:        e.indent,
+		indentPrefix:  e.indentPrefix,
+	}
+
+	valEnc := &encodeState{
+		indentEnabled: e.indentEnabled,
+		indentLevel:   e.indentLevel,
+		indent:        e.indent,
+		indentPrefix:  e.indentPrefix,
+	}
 
 	if err := valueEncoder(key)(keyEnc, key); err != nil {
 		return err
@@ -151,12 +186,15 @@ func keyValueEncoder(e *encodeState, key reflect.Value, value reflect.Value) err
 		return err
 	}
 
-	e.writeBytes(keyEnc.Bytes(), []byte{' ', '=', '>', ' '}, valEnc.Bytes())
+	keyBytes := bytes.TrimPrefix(keyEnc.Bytes(), keyEnc.getIndentBytes())
+	valBytes := bytes.TrimPrefix(valEnc.Bytes(), valEnc.getIndentBytes())
+
+	e.writeBytes(keyBytes, []byte{' ', '=', '>', ' '}, valBytes)
 	return nil
 }
 
-// encode generic interfaces
-func interfaceEncoder(e *encodeState, v reflect.Value) error {
+// encode generic interfaces and pointers
+func elementEncoder(e *encodeState, v reflect.Value) error {
 	if v.IsNil() {
 		e.writeStrings(`nil`)
 		return nil
@@ -168,19 +206,10 @@ func interfaceEncoder(e *encodeState, v reflect.Value) error {
 // encode structs
 func structEncoder(e *encodeState, v reflect.Value) error {
 	e.writeStrings(`{`)
-	if e.indentEnabled {
-		e.writeStrings("\n")
-	}
-
-	e.indentLevel += 1
-
-	defer func() {
-		e.indentLevel -= 1
-		e.writeStrings(`}`)
-	}()
 
 	structValue := structs.New(v.Interface())
 	structFields := structValue.Fields()
+	fieldsToWrite := make([]*encodeStructField, 0)
 
 	for i := 0; i < len(structFields); i++ {
 		structField := structFields[i]
@@ -213,19 +242,55 @@ func structEncoder(e *encodeState, v reflect.Value) error {
 			fieldName = structField.Name()
 		}
 
+		// specifying a field name of "-" skips that field
+		if fieldName == `-` {
+			skip = true
+		}
+
 		// if we're not skipping this field, write it to the buffer
 		if !skip {
-			keyValueEncoder(e, reflect.ValueOf(structField.Name()), reflect.ValueOf(structField.Value()))
+			fieldsToWrite = append(fieldsToWrite, &encodeStructField{
+				Name:  reflect.ValueOf(fieldName),
+				Value: reflect.ValueOf(structField.Value()),
+			})
+		}
+	}
 
-			// for all but the last element
-			if i < (len(structFields) - 1) {
-				e.writeStrings(`, `)
+	// only break and increase indentation if we have anything to write
+	if len(fieldsToWrite) > 0 {
+		if e.indentEnabled {
+			e.writeStringsUnindented("\n")
+		}
 
-				if e.indentEnabled {
-					e.writeStrings("\n")
-				}
+		e.indentLevel += 1
+	}
+
+	for i, field := range fieldsToWrite {
+		keyValueEncoder(e, field.Name, field.Value)
+
+		// for all but the last element
+		if i < (len(fieldsToWrite) - 1) {
+			e.writeStringsUnindented(`,`)
+
+			// trail all but the last field with a space after the comma,
+			// but only if we're not indenting (otherwise this space should be a line break)
+			if !e.indentEnabled {
+				e.writeStringsUnindented(` `)
 			}
 		}
+
+		// add line break if we're indenting
+		if e.indentEnabled {
+			e.writeStringsUnindented("\n")
+		}
+	}
+
+	if len(fieldsToWrite) > 0 {
+		e.indentLevel -= 1
+		e.writeStrings(`}`)
+	} else {
+		// if we didn't write anything, don't indent this (it's just an empty "{}")
+		e.writeStringsUnindented(`}`)
 	}
 
 	return nil
@@ -235,17 +300,6 @@ func structEncoder(e *encodeState, v reflect.Value) error {
 // key names and outputing them in lexical order
 func mapEncoder(e *encodeState, v reflect.Value) error {
 	e.writeStrings(`{`)
-
-	if e.indentEnabled {
-		e.writeStrings("\n")
-	}
-
-	e.indentLevel += 1
-
-	defer func() {
-		e.indentLevel -= 1
-		e.writeStrings(`}`)
-	}()
 
 	keys := v.MapKeys()
 
@@ -267,6 +321,15 @@ func mapEncoder(e *encodeState, v reflect.Value) error {
 	} else {
 		// otherwise, make sure strKeys is the same size as keys because of what we do with it below
 		strKeys = make([]string, len(keys))
+	}
+
+	// only break and increase indentation if we have anything to write
+	if len(strKeys) > 0 {
+		if e.indentEnabled {
+			e.writeStringsUnindented("\n")
+		}
+
+		e.indentLevel += 1
 	}
 
 	// iterare over strKeys to get the correct index, but pull the actual key value from keys
@@ -291,12 +354,28 @@ func mapEncoder(e *encodeState, v reflect.Value) error {
 
 		// for all but the last element, add comma and (optionally) linebreak
 		if i < (len(keys) - 1) {
-			e.writeStrings(`, `)
+			e.writeStringsUnindented(`,`)
 
-			if e.indentEnabled {
-				e.writeStrings("\n")
+			// trail all but the last field with a space after the comma,
+			// but only if we're not indenting (otherwise this space should be a line break)
+			if !e.indentEnabled {
+				e.writeStringsUnindented(` `)
 			}
 		}
+
+		// add line break if we're indenting
+		if e.indentEnabled {
+			e.writeStringsUnindented("\n")
+		}
+	}
+
+	// only lower indentation and close if we had anything to write
+	if len(strKeys) > 0 {
+		e.indentLevel -= 1
+		e.writeStrings(`}`)
+	} else {
+		// if we didn't write anything, don't indent this (it's just an empty "{}")
+		e.writeStringsUnindented(`}`)
 	}
 
 	return nil
@@ -304,12 +383,17 @@ func mapEncoder(e *encodeState, v reflect.Value) error {
 
 // encode arrays and slices
 func arrayEncoder(e *encodeState, v reflect.Value) error {
-	e.writeStrings(`[`)
+	e.writeStringsUnindented(`[`)
+
+	if e.indentEnabled {
+		e.writeStringsUnindented("\n")
+	}
+
 	e.indentLevel += 1
 
 	defer func() {
 		e.indentLevel -= 1
-		e.writeStrings(`]`)
+		e.writeStringsUnindented(`]`)
 	}()
 
 	// iterare over strKeys to get the correct index, but pull the actual key value from keys
@@ -322,18 +406,20 @@ func arrayEncoder(e *encodeState, v reflect.Value) error {
 
 		// for all but the last element
 		if i < (v.Len() - 1) {
-			e.writeStrings(`, `)
+			e.writeStringsUnindented(`,`)
 
-			if e.indentEnabled {
-				e.writeStrings("\n")
+			// trail all but the last field with a space after the comma,
+			// but only if we're not indenting (otherwise this space should be a line break)
+			if !e.indentEnabled {
+				e.writeStringsUnindented(` `)
 			}
+		}
+
+		// add line break if we're indenting
+		if e.indentEnabled {
+			e.writeStringsUnindented("\n")
 		}
 	}
 
-	return nil
-}
-
-// encode pointers to things
-func ptrEncoder(e *encodeState, v reflect.Value) error {
 	return nil
 }
