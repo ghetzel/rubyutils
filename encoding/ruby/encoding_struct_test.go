@@ -40,7 +40,7 @@ func TestEncodeStruct(t *testing.T) {
 		notExported: 5,
 	}
 
-	shouldBe := `{'Name' => 'test', 'count' => 1, 'SkipIfZero' => 2}`
+	shouldBe := `{'Name'=>'test', 'count'=>1, 'SkipIfZero'=>2}`
 
 	if err := e.marshal(in); err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestEncodeStructComplex(t *testing.T) {
 		},
 	}
 
-	shouldBe := `{'Name' => 'test', 'Data' => {'Key' => 'first-level', 'Value' => {'Key' => 'second-level'}}, 'Properties' => {'prop-1' => true, 'prop-2' => 4, 'prop-3' => {'subprop-1' => {'Key' => 'subnest-1', 'Value' => {}}}}}`
+	shouldBe := `{'Name'=>'test', 'Data'=>{'Key'=>'first-level', 'Value'=>{'Key'=>'second-level'}}, 'Properties'=>{'prop-1'=>true, 'prop-2'=>4, 'prop-3'=>{'subprop-1'=>{'Key'=>'subnest-1', 'Value'=>{}}}}}`
 
 	if err := e.marshal(in); err != nil {
 		t.Fatal(err)

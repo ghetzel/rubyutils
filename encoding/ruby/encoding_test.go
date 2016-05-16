@@ -205,7 +205,7 @@ func TestEncodeSimpleMapStrInt(t *testing.T) {
 		`third`:  3,
 	}
 
-	shouldBe := `{'first' => 1, 'second' => 2, 'third' => 3}`
+	shouldBe := `{'first'=>1, 'second'=>2, 'third'=>3}`
 
 	if err := e.marshal(in); err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func TestEncodeSimpleMapStrMixed(t *testing.T) {
 		`first`:  true,
 	}
 
-	shouldBe := `{'first' => true, 'second' => 4, 'third' => 9.6}`
+	shouldBe := `{'first'=>true, 'second'=>4, 'third'=>9.6}`
 
 	if err := e.marshal(in); err != nil {
 		t.Fatal(err)

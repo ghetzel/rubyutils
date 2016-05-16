@@ -189,7 +189,15 @@ func keyValueEncoder(e *encodeState, key reflect.Value, value reflect.Value) err
 	keyBytes := bytes.TrimPrefix(keyEnc.Bytes(), keyEnc.getIndentBytes())
 	valBytes := bytes.TrimPrefix(valEnc.Bytes(), valEnc.getIndentBytes())
 
-	e.writeBytes(keyBytes, []byte{' ', '=', '>', ' '}, valBytes)
+	var hashRocket []byte
+
+	if e.indentEnabled {
+		hashRocket = []byte{' ', '=', '>', ' '}
+	} else {
+		hashRocket = []byte{'=', '>'}
+	}
+
+	e.writeBytes(keyBytes, hashRocket, valBytes)
 	return nil
 }
 
