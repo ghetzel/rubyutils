@@ -1,0 +1,6 @@
+package: github.com/ghetzel/rubyutils
+import:
+- package: github.com/fatih/structs
+- package: github.com/ghetzel/go-stockutil
+  subpackages:
+  - stringutil

@@ -1,0 +1,10 @@
+hash: a7aff1f32007a4e90413cd6b6651eb037d9ed8be782c0be52a93f16ef17b0852
+updated: 2016-05-16T13:59:27.792033455-04:00
+imports:
+- name: github.com/fatih/structs
+  version: ""
+- name: github.com/ghetzel/go-stockutil
+  version: 45fbaaaf36a08d5f6764c57cf3a2143e5d894bca
+  subpackages:
+  - stringutil
+devImports: []
